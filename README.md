@@ -2,7 +2,7 @@
 
 ###  About
 
-This package allows you to translate text in VTT file to speach and output WAV files for each text segment.
+This package allows you to translate text in VTT file to speech and output WAV files for each text segment.
 It can also output a combined WAV file with all the WAV segments alligned to correct time positions.
 You can also automatically fix segements overlap so that the resulting file can be directly imported to your video.
 
