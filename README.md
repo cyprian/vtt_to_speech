@@ -2,7 +2,7 @@
 
 ###  About
 
-This package allows you to translate text in VTT file to speach and output WAV files for each text segment.
+This package allows you to translate text in VTT file to speech and output WAV files for each text segment.
 It can also output a combined WAV file with all the WAV segments alligned to correct time positions.
 You can also automatically fix segements overlap so that the resulting file can be directly imported to your video.
 
@@ -44,7 +44,7 @@ python translate_vtt.py
 * wav file for each of the text segments in a VTT file
 * adobe_audition_output_original.xml
 
-(_optional_) when flag `--auto_remove_overlap` was used is used:
+(_optional_) when flag `--auto_remove_overlap` is used:
 * combined wav file of all segments adjusted to correct time placement and corrected for any overlaps.
 * adjusted wav files
 * adobe_audition_output_adjusted.xml 
