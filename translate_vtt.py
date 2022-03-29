@@ -56,7 +56,7 @@ def parse_args():
 
     parser.add_argument('--allowed_overlap_milliseconds', type=int,
         default=50,
-        help='Maximum number of seconds one translation track can overlap the next translation track(default: %(default)s)')
+        help='Maximum number of milliseconds one translation track can overlap the next translation track(default: %(default)s)')
     
     parser.add_argument('--auto_remove_overlap',
         action='store_true',

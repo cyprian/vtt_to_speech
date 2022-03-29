@@ -46,7 +46,7 @@ python translate_vtt.py
 
 (_optional_) when flag `--auto_remove_overlap` was used is used:
 * combined wav file of all segments adjusted to correct time placement and corrected for any overlaps.
-* adjusted wav files if 
+* adjusted wav files
 * adobe_audition_output_adjusted.xml 
 
 ### Example 
@@ -87,7 +87,7 @@ To find available languages go to https://docs.microsoft.com/en-us/azure/cogniti
   Directory path to the outputs folder.
 
 --allowed_overlap_milliseconds (type=int) default=50,
-  Maximum number of seconds one translation track can overlap the next translation track
+  Maximum number of milliseconds one translation track can overlap the next translation track
 
 --auto_remove_overlap (action='store_true')
   Automatically speed up the the segment to fit the available space without overlap. If a track 1 overlaps track 2 by 1000 ms then the track 1 length will be speedup by 1000 ms.
