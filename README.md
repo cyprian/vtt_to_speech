@@ -44,7 +44,7 @@ python translate_vtt.py
 * wav file for each of the text segments in a VTT file
 * adobe_audition_output_original.xml
 
-(_optional_) when flag `--auto_remove_overlap` was used is used:
+(_optional_) when flag `--auto_remove_overlap` is used:
 * combined wav file of all segments adjusted to correct time placement and corrected for any overlaps.
 * adjusted wav files if 
 * adobe_audition_output_adjusted.xml 
