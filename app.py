@@ -208,10 +208,11 @@ def load_audio_segments_from_files(wave_files, trim_end_ms):
         segments.append(segment)
     return segments
 
-def check_for_overlaps(segments, start_times, auto_shrink=False, allowed_overlap=1):
+def check_for_overlaps(segments, start_times, auto_shrink=False, allowed_overlap=1, max_speedup=15):
     adjusted_segments = []
 
     has_overlap = False
+    error = False
     overlap_info = '\n'
     
     overlaps = 0
@@ -231,7 +232,13 @@ def check_for_overlaps(segments, start_times, auto_shrink=False, allowed_overlap
             if auto_shrink:
                 adjusted_segment, width_change_ratio = speedup_segment_by_miliseconds(segment, overlap)
                 adjusted_segments[position] = adjusted_segment
-                overlap_info = overlap_info + "**[FIXED]** File number " + str(position+1) + " was overlapping file number " + str(position+2) + " by **" + str(overlap_seconds) + " seconds**.\n\n\tFile was auto sped up by " + str(int((width_change_ratio - 1)*100))+ "%, and is now "+str(overlap_seconds)+" shorter. There is no overlap anymore.\n\n"
+                segment_speedup_percentage = round(((len(segment) - len(adjusted_segment))/ len(segment))*100)
+                # segment_speedup_percentage = int((width_change_ratio - 1)*100)
+                if(segment_speedup_percentage <= max_speedup):
+                    overlap_info = overlap_info + "**[FIXED]** File number " + str(position+1) + " was overlapping file number " + str(position+2) + " by **" + str(overlap_seconds) + " seconds**.\n\n\tFile was auto sped up by " + str(segment_speedup_percentage)+ "%, and is now "+str(overlap_seconds)+" shorter. There is no overlap anymore.\n\n"
+                else:
+                    error = True
+                    st.error("**[ERROR]** File number " + str(position+1) + " would have to be speed up by " + str(segment_speedup_percentage)+ "%, in order to not overlap with the next sentence. Your maximum allowed speed up to " + str(max_speedup) +"%. \n\n Adjust your max speedup or shorten you translation text.")
             else:
                 overlap_info = overlap_info + "**[OVERLAP]** File number " + str(position+1) + " overlaps the file number " + str(position+2) + " by **" + str(overlap_seconds) + " seconds**.\n\n"
 
@@ -242,7 +249,7 @@ def check_for_overlaps(segments, start_times, auto_shrink=False, allowed_overlap
         st.warning(overlap_info)
 
     #return adjusted segments
-    return (adjusted_segments, overlaps)
+    return (adjusted_segments, overlaps, error)
 
 def save_adjusted_translations(segments, destination):
 
@@ -437,7 +444,7 @@ def convert_time_to_frame(ms, fps):
 # WORKFLOW METHODS
 ######################
                    
-def tranlate_vtt_file(file, file_name, api_key, api_region, language, voice, remove_overlaps, use_existing_translations):
+def tranlate_vtt_file(file, file_name, api_key, api_region, language, voice, remove_overlaps, use_existing_translations, max_speedup):
 
     #create results directory
     output_folder = "./results"
@@ -463,38 +470,36 @@ def tranlate_vtt_file(file, file_name, api_key, api_region, language, voice, rem
 
     #Detect files overlap
     overlap_info = st.info('Checking if new translations will not overlap each other')
-    segments_adjusted, overlaps = check_for_overlaps(segments_original, start_times, auto_shrink=remove_overlaps, allowed_overlap=50)
-    st.success('Done!')
+    segments_adjusted, overlaps, error = check_for_overlaps(segments_original, start_times, auto_shrink=remove_overlaps, allowed_overlap=50, max_speedup=max_speedup)
 
-    if overlaps > 0 and not remove_overlaps:
-        overlap_warning = st.warning('[WARNING] There are " + str(overlaps) + " overlap(s) in your files. Fix them manually by rewriting translation text or use --auto_remove_overlap flag to automatically remove overlays by speeding the translation file.')
-    else:
-        #combine files into one wave
-        cobine_info = st.info('Combining audio files into a single file:')
+    if not error:
 
-        combined_segments = combine_segments(segments_adjusted, start_times)
-        # combined_segments_file_path = os.path.join(output_folder, str(file_name)[:-3]+'wav') 
-        combined_segments_file_path = os.path.join(output_folder,'result.wav') 
-        combined_segments.export(combined_segments_file_path, format="wav")
-
-        save_adjusted_translations(segments_adjusted, translations_folder)
-        show_wave_visualization(combined_segments_file_path)
-        generate_Adobe_Audition_FCP_XML(segments_adjusted, audio_folder=os.path.join(translations_folder, 'adjusted'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_output_adjusted.xml"))
-        
         st.success('Done!')
 
-    generate_Adobe_Audition_FCP_XML(segments_original, audio_folder=os.path.join(translations_folder, 'original'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_original.xml"))
+        if overlaps > 0 and not remove_overlaps:
+            overlap_warning = st.warning('[WARNING] There are " + str(overlaps) + " overlap(s) in your files. Fix them manually by rewriting translation text or use --auto_remove_overlap flag to automatically remove overlays by speeding the translation file.')
+        else:
+            #combine files into one wave
+            cobine_info = st.info('Combining audio files into a single file:')
 
-    zip_directory('./result', './results')
+            combined_segments = combine_segments(segments_adjusted, start_times)
+            # combined_segments_file_path = os.path.join(output_folder, str(file_name)[:-3]+'wav') 
+            combined_segments_file_path = os.path.join(output_folder,'result.wav') 
+            combined_segments.export(combined_segments_file_path, format="wav")
 
-    # st.download_button('Download file', binary_contents)  # Defaults to 'application/octet-stream'
+            save_adjusted_translations(segments_adjusted, translations_folder)
+            show_wave_visualization(combined_segments_file_path)
+            generate_Adobe_Audition_FCP_XML(segments_adjusted, audio_folder=os.path.join(translations_folder, 'adjusted'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_output_adjusted.xml"))
+            
+            st.success('Done!')
 
-    with open('result.zip', 'rb') as f:
-        st.download_button('Download translations', f, file_name='result.zip')  # Defaults to 'application/octet-stream'
+        generate_Adobe_Audition_FCP_XML(segments_original, audio_folder=os.path.join(translations_folder, 'original'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_original.xml"))
 
+        zip_directory('./result', './results')
 
-    # with open('./result.zip') as f:
-    #     st.download_button('Download results', f)
+        with open('result.zip', 'rb') as f:
+            st.download_button('Download translations', f, file_name='result.zip')  # Defaults to 'application/octet-stream'
+
 
 ######################
 # UI STREAMLIT METHODS
@@ -523,24 +528,6 @@ def get_available_languages_for_region(region, api_key):
 
     except:
         return None
-
-
-######################
-# ZIP METHODS
-######################       
-# import io
-# import zipfile
-
-# files array format [('file_name1.ext', io.BytesIO), ('file_name1.ext', io.BytesIO)]
-# def zip_files(zip_name, files):
-
-#     zip_buffer = io.BytesIO()
-#     with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED, False) as zip_file:
-#         for file_name, data in files:
-#             zip_file.writestr(file_name, data.getvalue())
-
-#     with open(zip_name, 'wb') as f:
-#         f.write(zip_buffer.getvalue())
 
 import shutil
 def zip_directory(zip_name, path):
@@ -586,6 +573,9 @@ def main():
         voice_api_name = voices.loc[voices['DisplayName'] == voice, 'ShortName'].iloc[0]
         if debug:  st.sidebar.write("Voice api name: ", voice_api_name)
 
+
+        max_voice_speedup = st.sidebar.slider('Max voice speed up %', 0, 30, 15)
+
         if debug:
             remove_overlaps = st.sidebar.checkbox('Automatically remove overlaps')
             use_existing_translations = st.sidebar.checkbox('Use existing translations (for debuging)')
@@ -599,7 +589,7 @@ def main():
             stringio = StringIO(vtt_file.getvalue().decode("utf-8"))
             string_data = stringio.read()
 
-            tranlate_vtt_file(file=string_data, file_name=vtt_file.name, api_key=api_key, api_region=api_region_id, language=language_locale, voice=voice_api_name, remove_overlaps=remove_overlaps, use_existing_translations=use_existing_translations)
+            tranlate_vtt_file(file=string_data, file_name=vtt_file.name, api_key=api_key, api_region=api_region_id, language=language_locale, voice=voice_api_name, remove_overlaps=remove_overlaps, use_existing_translations=use_existing_translations, max_speedup=max_voice_speedup)
             st.balloons()
     else:
         st.error('**[ERROR]** Could not load available translation types for region **'+ api_region +'**.\n\n Possible reasons:\n* You don\'t have internet \n*  Your API key does not match the **' + api_region + '** region. Try choosing a different region.')
