@@ -487,6 +487,15 @@ def tranlate_vtt_file(file, file_name, api_key, api_region, language, voice, rem
 
     zip_directory('./result', './results')
 
+    # st.download_button('Download file', binary_contents)  # Defaults to 'application/octet-stream'
+
+    with open('result.zip', 'rb') as f:
+        st.download_button('Download translations', f, file_name='result.zip')  # Defaults to 'application/octet-stream'
+
+
+    # with open('./result.zip') as f:
+    #     st.download_button('Download results', f)
+
 ######################
 # UI STREAMLIT METHODS
 ######################
