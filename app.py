@@ -586,8 +586,12 @@ def main():
         voice_api_name = voices.loc[voices['DisplayName'] == voice, 'ShortName'].iloc[0]
         if debug:  st.sidebar.write("Voice api name: ", voice_api_name)
 
-        remove_overlaps = st.sidebar.checkbox('Automatically remove overlaps')
-        use_existing_translations = st.sidebar.checkbox('Use existing translations (for debuging)')
+        if debug:
+            remove_overlaps = st.sidebar.checkbox('Automatically remove overlaps')
+            use_existing_translations = st.sidebar.checkbox('Use existing translations (for debuging)')
+        else:
+            remove_overlaps = True
+            use_existing_translations = False
 
         vtt_file = st.file_uploader(label="Upload VTT file", type=['vtt'], accept_multiple_files=False)
         if vtt_file is not None:
