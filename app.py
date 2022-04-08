@@ -41,11 +41,6 @@ def parse_args():
     desc = "Translate the text from VTT file to speech using Microsoft Cognito service and automatically join the translations into a single WAV file." 
     parser = argparse.ArgumentParser(description=desc)
 
-    parser.add_argument('--allowed_overlap_milliseconds', type=int,
-        default=50,
-        help='Maximum number of milliseconds one translation track can overlap the next translation track(default: %(default)s)')
-    
-    
     args = parser.parse_args()
     return args
 
@@ -468,7 +463,7 @@ def tranlate_vtt_file(file, file_name, api_key, api_region, language, voice, rem
 
     #Detect files overlap
     overlap_info = st.info('Checking if new translations will not overlap each other')
-    segments_adjusted, overlaps = check_for_overlaps(segments_original, start_times, auto_shrink=remove_overlaps, allowed_overlap=args.allowed_overlap_milliseconds)
+    segments_adjusted, overlaps = check_for_overlaps(segments_original, start_times, auto_shrink=remove_overlaps, allowed_overlap=50)
     st.success('Done!')
 
     if overlaps > 0 and not remove_overlaps:
