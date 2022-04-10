@@ -156,6 +156,7 @@ def load_audio_segments_from_files(wave_files, trim_end_ms):
         #add the space to the output
         segment = AudioSegment.from_file(wav_path, format="wav")
         segment = trim_end_of_segment(segment, trim_end_ms) 
+        segment.export(wav_path, format="wav")
         segments.append(segment)
     return segments
 
