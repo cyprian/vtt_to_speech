@@ -27,6 +27,7 @@ from tqdm import tqdm
 import re
 from pydub import AudioSegment
 import math
+import webvtt
 
 import azure.cognitiveservices.speech as speechsdk
 
@@ -109,28 +110,14 @@ def show_wave_visualization(file):
 ######################
 
 def parse_vtt_file(file):
-    opened_file = open(file,encoding='utf8')
-    content = opened_file.read()
-    parts = content.split('\n\n') # split on double line
-
-    # wrangle segments
-    m = re.compile(r"\<.*?\>") # strip/remove unwanted tags
-
-    new_parts = [clean(s,m) for s in parts if len(s)!=0][1:] #skip first line
-
     start_times = []
     end_times = []
     texts = []
-    for part in tqdm(new_parts):
-        split_part = part.split('\n')
 
-        time_code = split_part[0]
-        split_time_code = time_code.split()
-        start_times.append(time_in_miliseconds(split_time_code[0]))
-        end_times.append(time_in_miliseconds(split_time_code[1]))
-
-        text = split_part[1]
-        texts.append(text)
+    for caption in webvtt.read(file):  
+        start_times.append(time_in_miliseconds(caption.start))
+        end_times.append(time_in_miliseconds(caption.end))
+        texts.append(caption.text)
 
     return(texts, start_times, end_times)
     

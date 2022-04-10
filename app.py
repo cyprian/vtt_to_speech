@@ -30,10 +30,11 @@ import streamlit as st
 import pandas as pd
 import argparse
 import os
-import re
+from shutil import rmtree
 from pydub import AudioSegment
 import math
 from io import StringIO
+import webvtt
 
 import azure.cognitiveservices.speech as speechsdk
 
@@ -46,73 +47,23 @@ def parse_args():
 
 
 
-
-######################
-# HELPER METHODS
-######################
-
-import matplotlib.pyplot as plt
-import numpy as np
-import wave
-
-def show_wave_visualization(file):
-    raw = wave.open(file)
-     
-    signal = raw.readframes(-1)
-    signal = np.frombuffer(signal, dtype ="int16")
-     
-    f_rate = raw.getframerate()
- 
-    time = np.linspace(
-        0, # start
-        len(signal) / f_rate,
-        num = len(signal)
-    )
- 
-    plt.figure(1)
-    plt.title("Sound Wave")
-    plt.xlabel("Time")
-    
-    plt.plot(time, signal)
-    
-    file_name = os.path.basename(file)
-    file_name = str(file)[:-4]+'_sound_visualization'
-
-    plt.savefig(file_name)
-
 ######################
 # VTT PARSING METHODS
 ######################
 
 def parse_vtt_file(file):
-    parts = file.split('\n\n') # split on double line
-
-    # wrangle segments
-    m = re.compile(r"\<.*?\>") # strip/remove unwanted tags
-
-    new_parts = [clean(s,m) for s in parts if len(s)!=0][1:] #skip first line
 
     start_times = []
     end_times = []
     texts = []
-    for part in new_parts:
-        split_part = part.split('\n')
 
-        time_code = split_part[0]
-        split_time_code = time_code.split()
-        start_times.append(time_in_miliseconds(split_time_code[0]))
-        end_times.append(time_in_miliseconds(split_time_code[1]))
-
-        text = split_part[1]
-        texts.append(text)
+    for caption in webvtt.read_buffer(StringIO(file.getvalue().decode("utf-8"))):  
+        start_times.append(time_in_miliseconds(caption.start))
+        end_times.append(time_in_miliseconds(caption.end))
+        texts.append(caption.text)
 
     return(texts, start_times, end_times)
     
-def clean(content, m):
-    new_content = m.sub('',content)
-    new_content = new_content.replace('-->','')
-    return new_content
-
 
 def time_in_miliseconds(time):
     time = time.split(':')
@@ -238,7 +189,7 @@ def check_for_overlaps(segments, start_times, auto_shrink=False, allowed_overlap
                     overlap_info = overlap_info + "**[FIXED]** File number " + str(position+1) + " was overlapping file number " + str(position+2) + " by **" + str(overlap_seconds) + " seconds**.\n\n\tFile was auto sped up by " + str(segment_speedup_percentage)+ "%, and is now "+str(overlap_seconds)+" shorter. There is no overlap anymore.\n\n"
                 else:
                     error = True
-                    st.error("**[ERROR]** File number " + str(position+1) + " would have to be speed up by " + str(segment_speedup_percentage)+ "%, in order to not overlap with the next sentence. Your maximum allowed speed up to " + str(max_speedup) +"%. \n\n Adjust your max speedup or shorten you translation text.")
+                    st.error("**[ISSUE]** File number " + str(position+1) + " would have to be speed up by " + str(segment_speedup_percentage)+ "%, in order to not overlap with the next sentence. Your maximum allowed speed up to " + str(max_speedup) +"%. \n\n Adjust your max speedup or shorten you translation text.")
             else:
                 overlap_info = overlap_info + "**[OVERLAP]** File number " + str(position+1) + " overlaps the file number " + str(position+2) + " by **" + str(overlap_seconds) + " seconds**.\n\n"
 
@@ -472,33 +423,36 @@ def tranlate_vtt_file(file, file_name, api_key, api_region, language, voice, rem
     overlap_info = st.info('Checking if new translations will not overlap each other')
     segments_adjusted, overlaps, error = check_for_overlaps(segments_original, start_times, auto_shrink=remove_overlaps, allowed_overlap=50, max_speedup=max_speedup)
 
-    if not error:
+    # if not error:
 
+    st.success('Done!')
+
+    if overlaps > 0 and not remove_overlaps:
+        overlap_warning = st.warning('[WARNING] There are " + str(overlaps) + " overlap(s) in your files. Fix them manually by rewriting translation text or use --auto_remove_overlap flag to automatically remove overlays by speeding the translation file.')
+    else:
+        #combine files into one wave
+        cobine_info = st.info('Combining audio files into a single file:')
+
+        combined_segments = combine_segments(segments_adjusted, start_times)
+        # combined_segments_file_path = os.path.join(output_folder, str(file_name)[:-3]+'wav') 
+        combined_segments_file_path = os.path.join(output_folder,'result.wav') 
+        combined_segments.export(combined_segments_file_path, format="wav")
+
+        save_adjusted_translations(segments_adjusted, translations_folder)
+        generate_Adobe_Audition_FCP_XML(segments_adjusted, audio_folder=os.path.join(translations_folder, 'adjusted'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_output_adjusted.xml"))
+        
         st.success('Done!')
 
-        if overlaps > 0 and not remove_overlaps:
-            overlap_warning = st.warning('[WARNING] There are " + str(overlaps) + " overlap(s) in your files. Fix them manually by rewriting translation text or use --auto_remove_overlap flag to automatically remove overlays by speeding the translation file.')
-        else:
-            #combine files into one wave
-            cobine_info = st.info('Combining audio files into a single file:')
+    generate_Adobe_Audition_FCP_XML(segments_original, audio_folder=os.path.join(translations_folder, 'original'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_original.xml"))
 
-            combined_segments = combine_segments(segments_adjusted, start_times)
-            # combined_segments_file_path = os.path.join(output_folder, str(file_name)[:-3]+'wav') 
-            combined_segments_file_path = os.path.join(output_folder,'result.wav') 
-            combined_segments.export(combined_segments_file_path, format="wav")
+    zip_folder = file_name.split('.')[0]
+    zip_directory('./' + zip_folder, './results')
+    with open(zip_folder + '.zip', 'rb') as f:
+        st.download_button('Download translations', f, file_name=zip_folder + '.zip')
 
-            save_adjusted_translations(segments_adjusted, translations_folder)
-            show_wave_visualization(combined_segments_file_path)
-            generate_Adobe_Audition_FCP_XML(segments_adjusted, audio_folder=os.path.join(translations_folder, 'adjusted'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_output_adjusted.xml"))
-            
-            st.success('Done!')
+    #cleanup
+    rmtree(output_folder)
 
-        generate_Adobe_Audition_FCP_XML(segments_original, audio_folder=os.path.join(translations_folder, 'original'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_original.xml"))
-
-        zip_directory('./result', './results')
-
-        with open('result.zip', 'rb') as f:
-            st.download_button('Download translations', f, file_name='result.zip')  # Defaults to 'application/octet-stream'
 
 
 ######################
@@ -585,12 +539,9 @@ def main():
 
         vtt_file = st.file_uploader(label="Upload VTT file", type=['vtt'], accept_multiple_files=False)
         if vtt_file is not None:
-            # bytes_data = vtt_file.read()
-            stringio = StringIO(vtt_file.getvalue().decode("utf-8"))
-            string_data = stringio.read()
-
-            tranlate_vtt_file(file=string_data, file_name=vtt_file.name, api_key=api_key, api_region=api_region_id, language=language_locale, voice=voice_api_name, remove_overlaps=remove_overlaps, use_existing_translations=use_existing_translations, max_speedup=max_voice_speedup)
-            st.balloons()
+            if st.button('Translate'):
+                tranlate_vtt_file(file=vtt_file, file_name=vtt_file.name, api_key=api_key, api_region=api_region_id, language=language_locale, voice=voice_api_name, remove_overlaps=remove_overlaps, use_existing_translations=use_existing_translations, max_speedup=max_voice_speedup)
+                st.balloons()
     else:
         st.error('**[ERROR]** Could not load available translation types for region **'+ api_region +'**.\n\n Possible reasons:\n* You don\'t have internet \n*  Your API key does not match the **' + api_region + '** region. Try choosing a different region.')
 
