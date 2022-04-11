@@ -440,11 +440,11 @@ def tranlate_vtt_file(file, file_name, api_key, api_region, language, voice, rem
         combined_segments.export(combined_segments_file_path, format="wav")
 
         save_adjusted_translations(segments_adjusted, translations_folder)
-        generate_Adobe_Audition_FCP_XML(segments_adjusted, audio_folder=os.path.join(translations_folder, 'adjusted'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_output_adjusted.xml"))
+        generate_Adobe_Audition_FCP_XML(segments_adjusted, audio_folder=os.path.join('./individual_audio_files', 'adjusted'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_output_adjusted.xml"))
         
         st.success('Done!')
 
-    generate_Adobe_Audition_FCP_XML(segments_original, audio_folder=os.path.join(translations_folder, 'original'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_original.xml"))
+    generate_Adobe_Audition_FCP_XML(segments_original, audio_folder=os.path.join('./individual_audio_files', 'original'),  start_times=start_times, file_name=os.path.join(output_folder, "adobe_audition_original.xml"))
 
     zip_folder = file_name.split('.')[0]
     zip_directory('./' + zip_folder, './results')
